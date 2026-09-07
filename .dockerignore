@@ -1,0 +1,12 @@
+node_modules
+.next
+test-results
+playwright-report
+.git
+.env.local
+.env*.local
+*.log
+track.md
+test
+.claude
+initialpromt.txt

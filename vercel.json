@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/convert/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/session/[id]/regenerate/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/session/[id]/pdf/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}

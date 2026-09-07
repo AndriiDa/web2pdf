@@ -1,0 +1,1363 @@
+# Build a Production-Ready Web-to-PDF Application
+
+You are a senior full-stack engineer. Build a production-ready MVP web application that converts any public web URL into a clean, printable, properly paginated A4 PDF.
+
+The application must load the target website as a real browser would, execute JavaScript, wait for dynamic content, remove unwanted UI/reklama/popups, optimize the page for printing, generate an A4 PDF with intelligent pagination, and provide an interactive preview/editor before the user saves the final PDF.
+
+The workflow is session-based. Do NOT build document history, user accounts, permanent document storage, or a database for saved documents at this stage.
+
+---
+
+# 1. Product Goal
+
+The user enters a web URL.
+
+The application then:
+
+1. Opens the URL in a real Chromium browser using Playwright.
+2. Loads and renders the entire page.
+3. Executes JavaScript.
+4. Handles lazy-loaded content and images.
+5. Waits for dynamic content to stabilize.
+6. Removes ads, popups, cookie banners, overlays, floating widgets and other unwanted UI.
+7. Prepares a clean print version.
+8. Generates an A4 PDF using intelligent pagination.
+9. Shows the cleaned web page in an editable preview.
+10. Shows the generated PDF in a PDF preview.
+11. Lets the user manually remove/restore/hide elements.
+12. Regenerates the PDF after edits.
+13. When the user is satisfied, provides the final PDF for download.
+
+The key objective is:
+
+> Preserve the meaningful content of the webpage while producing a professional, readable A4 PDF with no unwanted advertisements, overlays or clipped content.
+
+Do not create a simplistic `page.pdf()` wrapper. Build a real webpage preparation and pagination pipeline.
+
+---
+
+# 2. Technology Stack
+
+Use:
+
+* Next.js
+* Node.js
+* TypeScript
+* React
+* Playwright
+* Chromium
+* Server-side PDF generation
+* Modern CSS
+* Tailwind CSS if useful
+* PDF.js or an equivalent reliable PDF rendering solution for the browser preview
+
+Use the latest stable versions that are compatible with the selected deployment architecture.
+
+Before implementing deployment-specific functionality, verify current official Vercel documentation and current Playwright/Chromium compatibility rather than relying on outdated assumptions.
+
+Architecture should be compatible with Vercel where practical.
+
+If a Playwright/Chromium workload is unsuitable for a normal Vercel Serverless Function, clearly separate the frontend/API from the browser/PDF generation worker and use a deployment-compatible architecture.
+
+Do not introduce unnecessary infrastructure.
+
+---
+
+# 3. Overall Architecture
+
+Use a clean modular architecture.
+
+Suggested structure:
+
+Frontend:
+
+Next.js / React
+
+Main screens:
+
+* URL input
+* Loading / processing state
+* Clean webpage editor
+* PDF preview
+* Settings
+* Final download
+
+Backend responsibilities:
+
+* URL validation
+* SSRF protection
+* Playwright browser lifecycle
+* webpage rendering
+* page cleanup
+* lazy content loading
+* DOM extraction
+* printable DOM generation
+* PDF generation
+* session state
+
+Core modules should be separated, for example:
+
+* url-validator
+* browser-service
+* page-loader
+* content-loader
+* popup-cleaner
+* ad-detector
+* dom-analyzer
+* print-layout-engine
+* pagination-engine
+* pdf-generator
+* session-manager
+
+Keep components testable and reusable.
+
+---
+
+# 4. User Interface
+
+Build a clean, modern, minimal interface.
+
+Initial screen:
+
+* URL input field
+* "Create PDF" button
+
+Example:
+
+URL:
+https://example.com/article
+
+Button:
+Create PDF
+
+After processing, show an editor workspace.
+
+Desktop layout:
+
+LEFT:
+Clean webpage preview/editor
+
+RIGHT:
+PDF preview
+
+Top toolbar:
+
+* Undo
+* Redo
+* Restore
+* Remove
+* Hide
+* Regenerate PDF
+* Zoom
+* A4 page indicator
+* Settings
+* Download PDF
+
+Mobile layout may switch to tabs:
+
+* Clean Page
+* PDF Preview
+
+The UI should feel like a lightweight document editor, not an engineering tool.
+
+---
+
+# 5. Session-Based Workflow
+
+No authentication.
+
+No persistent history.
+
+No database requirement.
+
+Each conversion exists only for the current session.
+
+A session should contain:
+
+* source URL
+* rendered page state
+* cleaned DOM representation
+* removed elements
+* hidden elements
+* user modifications
+* current PDF
+* current settings
+
+When the session expires, its temporary data may be removed.
+
+Use sensible size and timeout limits.
+
+---
+
+# 6. URL Validation and SSRF Protection
+
+This is mandatory.
+
+The server must NEVER blindly request arbitrary internal network resources.
+
+Before Playwright opens a URL:
+
+Block:
+
+* localhost
+* 127.0.0.0/8
+* 0.0.0.0
+* private IPv4 ranges
+* private IPv6 ranges
+* link-local addresses
+* cloud metadata endpoints
+* internal hostnames
+* file://
+* data://
+* javascript://
+* other dangerous protocols
+
+Validate:
+
+* protocol must be HTTP or HTTPS
+* hostname
+* DNS resolution
+* redirects
+* final destination after redirects
+
+Re-check destination after every redirect.
+
+Protect against DNS rebinding where practical.
+
+Add:
+
+* request timeout
+* navigation timeout
+* maximum redirects
+* maximum response size
+* maximum page processing time
+
+Never expose server filesystem paths or internal errors to the user.
+
+---
+
+# 7. Full Page Loading
+
+Do NOT treat `DOMContentLoaded` alone as page completion.
+
+The browser service must:
+
+1. Navigate to the page.
+2. Wait for initial DOM.
+3. Wait for network activity to settle.
+4. Allow JavaScript execution.
+5. Wait for images and important fonts.
+6. Detect dynamically inserted content.
+7. Scroll through the page progressively to trigger lazy loading.
+8. Continue scrolling until content stops increasing.
+9. Wait again for network activity and layout stabilization.
+10. Perform a final layout pass.
+
+Support pages built using:
+
+* React
+* Vue
+* Angular
+* Next.js
+* other JavaScript-heavy frameworks
+
+The implementation must be robust against:
+
+* lazy-loaded images
+* infinite-scroll content
+* delayed content
+* dynamically inserted components
+* client-side rendering
+
+However, enforce limits to prevent pages with infinite loading from hanging forever.
+
+Possible safeguards:
+
+* maximum total scroll iterations
+* maximum page height
+* maximum execution time
+* stop if page height/content remains unchanged for several cycles
+
+---
+
+# 8. Image Loading
+
+Images are critical.
+
+For every relevant image:
+
+* wait for it to load
+* support normal `src`
+* support lazy-loading
+* support `srcset`
+* resolve the final loaded image
+* preserve aspect ratio
+* prevent accidental cropping
+* prevent overflow outside printable content
+
+Before PDF generation, verify that images have valid dimensions.
+
+Images must not be cut in the middle merely because of page boundaries when a reasonable alternative exists.
+
+Prefer:
+
+```css
+break-inside: avoid;
+page-break-inside: avoid;
+```
+
+for image-containing blocks.
+
+Large images should be scaled proportionally.
+
+If an image is too large to fit on a normal page, intelligently scale it to fit within printable A4 width.
+
+For exceptionally tall images or infographics, use an intelligent strategy that avoids destructive cropping.
+
+---
+
+# 9. Automatic Popup Removal
+
+Automatically detect and remove common intrusive UI.
+
+Examples:
+
+* modal dialogs
+* newsletter prompts
+* signup overlays
+* subscription popups
+* login prompts covering content
+* cookie banners
+* cookie management dialogs
+* consent overlays
+* fullscreen promotional overlays
+* "subscribe" overlays
+* exit-intent popups
+* floating promotional boxes
+
+Do not delete meaningful article content.
+
+The detection system must use multiple signals rather than one CSS class.
+
+Possible signals:
+
+* fixed/sticky positioning
+* high z-index
+* viewport coverage
+* backdrop/overlay presence
+* semantic labels
+* known cookie/consent keywords
+* close button patterns
+* modal roles
+* common class/id names
+
+Examples of keywords:
+
+cookie
+consent
+privacy
+subscribe
+newsletter
+sign up
+register
+advertisement
+promo
+promotion
+
+These are signals, not absolute rules.
+
+Avoid deleting normal content simply because it contains one of these words.
+
+---
+
+# 10. Automatic Advertisement Removal
+
+Implement a dedicated ad-cleaning layer.
+
+Detect common advertising patterns using multiple signals.
+
+Potential indicators:
+
+* ad-related IDs/classes
+* `iframe`
+* known ad network domains
+* Google Ads / AdSense
+* common advertising containers
+* elements with advertising semantics
+* sponsored banner patterns
+* empty ad slots
+* sticky ad containers
+* floating ad containers
+* "advertisement" labels
+* promotional placeholders
+
+Do NOT remove content just because it is an iframe.
+
+Some iframes may contain meaningful content.
+
+Make the ad classifier conservative.
+
+The goal is:
+
+> Remove obvious advertising and intrusive promotional content while preserving meaningful page content.
+
+---
+
+# 11. Other Unwanted UI
+
+By default, consider removing:
+
+* floating chat buttons
+* social share widgets
+* sticky promotional bars
+* "related products" advertising widgets
+* app-install banners
+* notification prompts
+* "download our app" overlays
+* browser-like overlays implemented by the site
+* floating feedback buttons
+* unnecessary social widgets
+
+Preserve:
+
+* article title
+* article body
+* headings
+* meaningful images
+* captions
+* tables
+* lists
+* citations
+* author
+* publication date
+* meaningful metadata
+* relevant navigation when useful
+* meaningful embedded content
+
+Do NOT blindly strip the page down to raw article text.
+
+The resulting PDF should visually resemble a clean professional document.
+
+---
+
+# 12. Manual Editing
+
+The user must be able to manually modify the cleaned page.
+
+In the Clean Page preview:
+
+When hovering an element:
+
+* visually highlight it
+* show an unobtrusive outline
+
+On click:
+
+show contextual controls such as:
+
+* Remove
+* Hide
+* Restore
+* Cancel
+
+Removed elements should be tracked so Undo/Redo works.
+
+Support:
+
+* Undo
+* Redo
+* Restore all
+* Remove selected element
+* Hide selected element
+
+Manual modifications must be applied to the DOM state used for PDF generation.
+
+Do NOT implement fake overlays that merely cover content visually.
+
+---
+
+# 13. Two Preview Modes
+
+The application MUST provide both:
+
+## A. Clean Web Preview
+
+Shows the webpage after:
+
+* rendering
+* lazy loading
+* popup removal
+* ad removal
+* print preparation
+
+The user can interact with this preview/editor.
+
+## B. PDF Preview
+
+Shows the actual generated A4 PDF.
+
+The PDF preview must reflect the latest state.
+
+Workflow:
+
+Clean webpage
+→ Generate PDF
+→ Display PDF preview
+→ User edits DOM
+→ Generate again
+→ Update PDF preview
+
+The two views should be visually synchronized as much as practical.
+
+---
+
+# 14. A4 PDF
+
+The PDF output must use A4 paper.
+
+Use portrait as the default.
+
+Allow landscape only if configured later; do not make landscape the default.
+
+Use dimensions corresponding to true A4:
+
+210mm × 297mm
+
+Set sensible print margins.
+
+Do NOT create a single giant PDF page containing the entire webpage.
+
+The webpage must be paginated into normal A4 pages.
+
+---
+
+# 15. Intelligent Pagination
+
+This is one of the most important parts of the implementation.
+
+Do not simply let Chromium cut the page anywhere.
+
+The pagination algorithm should try to preserve semantic blocks.
+
+Avoid splitting:
+
+* images
+* image + caption groups
+* headings from their following content
+* table rows
+* cards
+* code blocks
+* blockquotes
+* lists where reasonably possible
+* figures
+* captions
+* important UI groups
+
+Prefer CSS:
+
+```css
+break-inside: avoid;
+page-break-inside: avoid;
+break-before: auto;
+break-after: auto;
+```
+
+But do not rely entirely on CSS.
+
+Build a layout analysis layer that detects meaningful block boundaries.
+
+If a block does not fit in the remaining space:
+
+* move the entire block to the next page when possible
+* if the block itself is larger than one A4 page, use a controlled split strategy
+
+Never allow accidental clipping.
+
+---
+
+# 16. Headings
+
+Avoid orphaned headings.
+
+A heading should not appear as the last line on a page while its associated content begins on the next page.
+
+Use:
+
+```css
+break-after: avoid;
+page-break-after: avoid;
+```
+
+and/or equivalent layout logic.
+
+For important headings, try to keep at least one following content block on the same page.
+
+---
+
+# 17. Images and Page Boundaries
+
+Never create situations like:
+
+Page 1:
+half of a photo
+
+Page 2:
+other half of the photo
+
+unless there is absolutely no practical alternative because the image itself is larger than one page.
+
+Normally:
+
+* move image to next page
+* preserve complete image
+* scale image proportionally
+
+Do not distort aspect ratio.
+
+---
+
+# 18. Tables
+
+Tables need special handling.
+
+Requirements:
+
+* preserve table layout
+* prevent horizontal overflow
+* scale wide tables when possible
+* repeat table headers on subsequent pages when possible
+* avoid splitting individual rows when practical
+* prevent clipping
+
+If a table cannot reasonably fit at normal scale:
+
+* reduce font size/scale within reasonable bounds
+* reduce width proportionally
+* use landscape only if that option is explicitly enabled later
+
+For MVP, keep A4 portrait as the default behavior.
+
+---
+
+# 19. Code Blocks
+
+Code blocks should:
+
+* retain formatting
+* use readable font size
+* wrap horizontally when possible
+* avoid horizontal clipping
+
+Large code blocks may split vertically between pages.
+
+Do not split individual lines horizontally in a way that makes code unreadable.
+
+---
+
+# 20. PDF Typography
+
+Create a sensible print stylesheet.
+
+The PDF should be:
+
+* readable
+* professional
+* high quality
+* visually consistent
+
+Use print-safe CSS.
+
+Do not preserve unnecessary website animations.
+
+Disable:
+
+* animations
+* transitions
+* blinking elements
+* hover effects
+* interactive controls that do not belong in a document
+
+Convert interactive behavior to its currently visible state where appropriate.
+
+---
+
+# 21. Video
+
+PDF cannot contain normal interactive video playback.
+
+For video elements:
+
+* preserve a useful poster/thumbnail when available
+* preserve title/caption when available
+* remove player controls
+* avoid blank huge video areas
+
+Do not download entire videos just to embed them in the PDF.
+
+---
+
+# 22. Interactive Elements
+
+For:
+
+* tabs
+* accordions
+* charts
+* interactive maps
+* expandable sections
+
+capture the current visible state.
+
+The goal is to preserve what the user sees at the moment of conversion.
+
+Do not attempt to convert complex JavaScript applications into interactive PDF components.
+
+---
+
+# 23. Hyperlinks
+
+Preserve meaningful hyperlinks.
+
+Links in the final PDF should remain clickable where supported by the PDF generation pipeline.
+
+Do not render them as raw ugly URLs unless that is how the original page displays them.
+
+---
+
+# 24. Header/Footer
+
+Provide optional PDF settings for:
+
+* page number
+* document title
+* source URL
+* generation date
+
+Default:
+
+* page numbers enabled
+* source URL optional
+* generation date optional
+* document title derived from the webpage title
+
+Do not let header/footer overlap the content.
+
+---
+
+# 25. Settings
+
+Provide a small settings panel.
+
+At minimum:
+
+Paper:
+
+* A4
+
+Orientation:
+
+* Portrait
+
+Margins:
+
+* Normal
+* Narrow
+* Wide
+
+Optional toggles:
+
+* Page numbers
+* Source URL
+* Generation date
+
+Do not overload the MVP with dozens of settings.
+
+---
+
+# 26. Clean Document Extraction
+
+Build a preparation stage that transforms the rendered webpage into a print-friendly representation.
+
+Important:
+
+Do not blindly preserve the original page CSS.
+
+Websites frequently contain:
+
+* responsive/mobile layout rules
+* sticky elements
+* fixed positioning
+* viewport-specific behavior
+* dark mode
+* animations
+* complex grids
+
+Create a controlled print environment.
+
+The cleaned document should have:
+
+* stable width
+* predictable typography
+* normal document flow
+* no sticky/fixed advertising
+* no viewport overlays
+* controlled margins
+* predictable page breaks
+
+---
+
+# 27. Preserve Main Content
+
+The cleaning engine must aggressively remove noise but protect meaningful content.
+
+At a high level, identify likely main content using signals such as:
+
+* semantic HTML
+* article/main tags
+* text density
+* DOM hierarchy
+* heading structure
+* image placement
+* paragraph density
+* repeated navigation/footer patterns
+
+Do not assume the `<article>` element always exists.
+
+Do not reduce the whole page to a text extractor.
+
+Preserve visual structure.
+
+---
+
+# 28. Failure Handling
+
+The UI must gracefully handle:
+
+* invalid URL
+* unreachable website
+* timeout
+* page blocked
+* robots/access restrictions
+* JavaScript failure
+* excessive page size
+* infinite scrolling
+* missing images
+* browser crash
+* PDF generation failure
+
+Use clear user-friendly errors.
+
+Examples:
+
+"Unable to load this webpage."
+
+"The webpage took too long to finish loading."
+
+"The page could not be converted safely."
+
+Do not expose stack traces to normal users.
+
+Log detailed errors server-side.
+
+---
+
+# 29. Resource Limits
+
+Protect the application from expensive or malicious webpages.
+
+Define sane limits for:
+
+* maximum navigation time
+* maximum total processing time
+* maximum number of scroll cycles
+* maximum page height
+* maximum HTML size
+* maximum image/resource size
+* maximum concurrent browser jobs
+
+Make these configurable through environment variables.
+
+---
+
+# 30. Browser Management
+
+Implement proper Playwright lifecycle management.
+
+Requirements:
+
+* avoid launching a new browser unnecessarily for every small operation
+* cleanly close contexts/pages
+* prevent zombie Chromium processes
+* isolate sessions
+* enforce timeouts
+* capture useful logs
+* handle browser crashes
+
+Do not accidentally share state/cookies between unrelated sessions.
+
+---
+
+# 31. Security
+
+Treat the target webpage as untrusted content.
+
+Protect against:
+
+* SSRF
+* malicious redirects
+* resource exhaustion
+* oversized documents
+* malicious HTML
+* script injection into the editor
+* unsafe URLs
+* internal network access
+* data exfiltration
+* session manipulation
+
+Sanitize any HTML that is returned to the client.
+
+Do not directly inject arbitrary page HTML into the Next.js application without a safe isolation strategy.
+
+Use iframe sandboxing or another appropriate mechanism where necessary.
+
+---
+
+# 32. Preview Isolation
+
+Because the source webpage is untrusted, never allow arbitrary source-page JavaScript to execute in the application UI.
+
+The cleaned preview must be isolated.
+
+Possible solution:
+
+* sanitized DOM
+* isolated iframe
+* sandboxed iframe
+* disabled scripts
+* controlled resource loading
+
+The preview editor needs to manipulate the DOM, but the original page's JavaScript must not gain access to the parent application.
+
+---
+
+# 33. API Design
+
+Design clear API endpoints.
+
+Example:
+
+POST `/api/convert`
+
+Input:
+
+```json
+{
+  "url": "https://example.com/article"
+}
+```
+
+Returns:
+
+```json
+{
+  "sessionId": "...",
+  "status": "ready"
+}
+```
+
+Session operations could include:
+
+GET `/api/session/:id`
+
+POST `/api/session/:id/regenerate`
+
+POST `/api/session/:id/action`
+
+GET `/api/session/:id/pdf`
+
+Use appropriate methods and validation.
+
+The exact route design can be improved as implementation proceeds.
+
+---
+
+# 34. Session Editing Actions
+
+Actions may look conceptually like:
+
+```json
+{
+  "action": "remove",
+  "elementId": "element-123"
+}
+```
+
+or:
+
+```json
+{
+  "action": "restore",
+  "elementId": "element-123"
+}
+```
+
+Support undo/redo through a command/action history.
+
+Do not send entire HTML documents back and forth unnecessarily.
+
+Prefer stable element identifiers and a controlled DOM representation.
+
+---
+
+# 35. Visual Selection System
+
+The editor should make it obvious which element the user is selecting.
+
+On hover:
+
+* subtle outline
+
+On selection:
+
+* stronger outline
+* contextual menu
+
+The editor must avoid changing the actual visual document layout significantly merely because an element is selected.
+
+---
+
+# 36. Performance
+
+The application should feel responsive.
+
+Show progress stages such as:
+
+1. Loading website
+2. Rendering content
+3. Loading images
+4. Removing unwanted elements
+5. Preparing print layout
+6. Generating PDF
+7. Ready
+
+Do not block the UI with a frozen screen.
+
+Where practical, use asynchronous processing and progress updates.
+
+---
+
+# 37. Testing
+
+Write meaningful automated tests.
+
+At minimum:
+
+Unit tests for:
+
+* URL validation
+* SSRF protection
+* ad detection
+* popup detection
+* pagination calculations
+* element classification
+* session actions
+
+Integration tests for:
+
+* loading a dynamic page
+* lazy-loaded images
+* popup removal
+* ad removal
+* PDF generation
+* manual element removal
+* undo/redo
+
+Include representative test HTML pages with:
+
+* normal article
+* ads
+* cookie popup
+* sticky header
+* lazy images
+* large image
+* table
+* long article
+* headings
+* cards
+* code block
+
+Test that the final PDF is generated successfully and does not clip expected content.
+
+---
+
+# 38. Visual Regression Testing
+
+Where practical, add visual regression or screenshot-based testing for representative HTML fixtures.
+
+Important cases:
+
+* heading near page boundary
+* image near page boundary
+* long image
+* table spanning pages
+* sticky ad removal
+* popup removal
+* long article
+* mixed text and images
+
+The objective is to detect accidental layout regressions.
+
+---
+
+# 39. Logging
+
+Use structured server-side logs.
+
+Log:
+
+* session ID
+* source hostname
+* processing stage
+* duration
+* page dimensions
+* number of detected ads
+* number of removed popups
+* number of images
+* PDF page count
+* errors
+
+Do not log secrets, cookies, authentication information, or sensitive page content unnecessarily.
+
+---
+
+# 40. Deployment
+
+Target deployment:
+
+* Next.js on Vercel or a compatible frontend deployment
+* Node.js runtime
+* Chromium/Playwright execution in a deployment environment that can reliably support the workload
+
+Before finalizing deployment architecture, check the current official documentation for:
+
+* Vercel function runtime limitations
+* max execution duration
+* supported Node.js versions
+* Playwright compatibility
+* Chromium packaging requirements
+
+Do not pretend a deployment is production-ready if the chosen Vercel environment cannot reliably execute the browser workload.
+
+If a separate worker is necessary, implement the architecture accordingly and document the deployment steps.
+
+---
+
+# 41. Environment Variables
+
+Provide a `.env.example`.
+
+Potential variables:
+
+```env
+APP_URL=
+MAX_PROCESSING_TIME_MS=
+MAX_PAGE_SIZE_BYTES=
+MAX_PAGE_HEIGHT_PX=
+MAX_SCROLL_ITERATIONS=
+BROWSER_TIMEOUT_MS=
+PDF_TIMEOUT_MS=
+```
+
+Add any variables actually required by the chosen architecture.
+
+Never hardcode secrets.
+
+---
+
+# 42. Code Quality
+
+Requirements:
+
+* TypeScript strict mode
+* clean architecture
+* meaningful type definitions
+* small reusable functions
+* no unnecessary duplication
+* comments for complex browser/layout logic
+* defensive error handling
+* no `any` unless truly unavoidable
+* ESLint
+* formatting
+* clear naming
+
+Avoid building everything in one huge API route.
+
+---
+
+# 43. README
+
+Create a complete README covering:
+
+* what the application does
+* architecture
+* local setup
+* installing Playwright/Chromium
+* environment variables
+* running development mode
+* running tests
+* building
+* deployment
+* Vercel limitations
+* worker architecture if applicable
+* known limitations
+
+Include exact commands.
+
+---
+
+# 44. Implementation Strategy
+
+Build this in phases.
+
+Phase 1:
+Create Next.js application shell and URL form.
+
+Phase 2:
+Implement secure URL validation and SSRF protection.
+
+Phase 3:
+Implement Playwright page loading.
+
+Phase 4:
+Implement full-page/lazy-content loading.
+
+Phase 5:
+Implement popup/ad/noise cleanup.
+
+Phase 6:
+Implement clean-page preview/editor.
+
+Phase 7:
+Implement A4 print stylesheet and intelligent pagination.
+
+Phase 8:
+Implement PDF generation.
+
+Phase 9:
+Implement PDF preview.
+
+Phase 10:
+Implement manual editing + regeneration.
+
+Phase 11:
+Implement settings.
+
+Phase 12:
+Add tests and security hardening.
+
+Phase 13:
+Deployment verification and documentation.
+
+Do not stop at a mock UI.
+
+The application must actually work end-to-end.
+
+---
+
+# 45. Important Product Principles
+
+Throughout implementation, prioritize these principles:
+
+1. Never clip meaningful content.
+2. Never allow ads/popups to dominate the PDF.
+3. Never allow arbitrary source-page JavaScript to compromise the application.
+4. Never expose internal server resources.
+5. Preserve meaningful page structure.
+6. Prefer complete images instead of splitting them.
+7. Prefer semantic page breaks.
+8. Make manual cleanup easy.
+9. Make PDF preview reflect the actual final PDF.
+10. Keep the UI simple.
+11. Keep the architecture maintainable.
+12. Optimize for reliable real-world webpages, not only toy examples.
+
+---
+
+# 46. Definition of Done
+
+The project is complete only when this full scenario works:
+
+1. User opens the application.
+2. User enters a public webpage URL.
+3. Application validates it securely.
+4. Chromium loads the real webpage.
+5. JavaScript executes.
+6. Lazy content loads.
+7. The page is scrolled enough to trigger lazy loading.
+8. Dynamic content stabilizes.
+9. Ads are detected and removed.
+10. Popups/cookie banners/overlays are removed.
+11. Unwanted floating UI is removed.
+12. Meaningful content remains.
+13. User sees the cleaned webpage in the editor.
+14. User can select an element.
+15. User can remove it.
+16. User can undo it.
+17. User can restore it.
+18. Application generates an A4 PDF.
+19. Pages use intelligent pagination.
+20. Images are not unnecessarily clipped.
+21. Headings are not unnecessarily orphaned.
+22. Tables behave reasonably across pages.
+23. PDF preview displays the real PDF.
+24. User can edit again.
+25. PDF regenerates.
+26. Final PDF downloads successfully.
+27. No document history is stored.
+28. The application does not expose internal network access.
+29. Tests pass.
+30. README explains how to run and deploy the application.
+
+---
+
+# 47. How You Should Work
+
+You are not merely generating example code.
+
+Actually create the application.
+
+Before writing significant code:
+
+* inspect the project structure
+* determine whether a project already exists
+* identify the appropriate Next.js architecture
+* verify current Vercel/Playwright constraints from official documentation
+* choose the smallest production-appropriate architecture
+
+Then implement the system incrementally.
+
+After each major subsystem:
+
+* run type checking
+* run linting
+* run tests
+* fix errors
+* verify the end-to-end flow
+
+Do not leave core functionality as TODOs.
+
+Do not replace difficult parts with fake/mock implementations.
+
+When something is technically impossible or unreliable in the chosen deployment environment, explicitly document the limitation and implement the closest production-safe architecture instead.
+
+At the end, provide:
+
+1. concise architecture summary
+2. files created/changed
+3. local development commands
+4. test commands
+5. deployment instructions
+6. known limitations
+7. next recommended improvements
+
+The final result must be a working MVP, not a prototype mockup.

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Quiet Engineering Behind Tidal Power</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 780px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #222; }
+  header.site { position: sticky; top: 0; background: #123; color: #fff; padding: 12px; z-index: 9000; }
+  .cookie-banner {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999;
+    background: rgba(15, 15, 20, 0.97); color: #fff; padding: 22px;
+  }
+  .newsletter-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6); z-index: 99998; display: block;
+  }
+  .newsletter-modal .box { background: #fff; margin: 12% auto; padding: 32px; width: 420px; }
+  .ad-slot { background: #f0f0f0; border: 1px dashed #bbb; text-align: center; color: #999; }
+  .leaderboard { width: 728px; height: 90px; }
+  .mpu { width: 300px; height: 250px; margin: 20px auto; }
+  .chat-widget { position: fixed; right: 20px; bottom: 20px; width: 60px; height: 60px; border-radius: 50%; background: #06c; z-index: 9500; }
+  .share-bar { position: sticky; top: 60px; z-index: 500; background: #fafafa; padding: 8px; }
+  figure { margin: 24px 0; }
+  figure img { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 13px; color: #666; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+  pre { background: #f6f8fa; padding: 12px; overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <nav><a href="/">Home</a> · <a href="/energy">Energy</a> · <a href="/about">About</a></nav>
+</header>
+
+<!-- Ads and intrusive UI that the cleaner must remove -->
+<div class="ad-slot leaderboard" id="div-gpt-ad-header-1" data-ad-slot="12345">
+  Advertisement
+</div>
+
+<div class="cookie-banner" role="dialog" aria-modal="true" aria-label="Cookie consent">
+  <p>We use cookies and similar technologies to personalise content and ads, and to analyse our traffic.</p>
+  <button class="accept">Accept all cookies</button>
+  <button class="close" aria-label="Close">×</button>
+</div>
+
+<div class="newsletter-modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h2>Subscribe to our newsletter</h2>
+    <p>Get the best of our journalism delivered to your inbox every morning.</p>
+    <input type="email" placeholder="you@example.com">
+    <button>Sign up</button>
+    <button class="close" aria-label="Close">✕</button>
+  </div>
+</div>
+
+<div class="chat-widget" aria-label="Open live chat"></div>
+
+<article>
+  <h1>The Quiet Engineering Behind Tidal Power</h1>
+  <p class="byline">By Rowan Whitfield · 14 March 2026</p>
+
+  <div class="share-bar">
+    <a href="#">Share on Twitter</a> · <a href="#">Share on Facebook</a> · <a href="#">Email this</a>
+  </div>
+
+  <p>Tidal energy has spent four decades as the perpetual understudy of renewable power, always
+    promising and rarely delivered. That reputation is beginning to look outdated, and the reason has
+    less to do with turbines than with the unglamorous business of predicting corrosion, scheduling
+    maintenance windows, and financing hardware that must survive thirty years underwater.</p>
+
+  <p>The physics were never the difficulty. Water is roughly eight hundred times denser than air,
+    which means a tidal rotor can be far smaller than a wind turbine of equivalent output. Tides are
+    also almost perfectly predictable, decades in advance, which is a property no other renewable
+    source can claim. The difficulty has always been that the sea is an extraordinarily hostile place
+    to keep a machine.</p>
+
+  <figure>
+    <img src="/img/turbine.svg" alt="A tidal turbine being lowered into place" width="900" height="500">
+    <figcaption>A 1.5 MW rotor is lowered onto its gravity base in the Pentland Firth.</figcaption>
+  </figure>
+
+  <h2>Why the maintenance schedule decides the economics</h2>
+
+  <p>Every offshore intervention requires a vessel, a weather window, and a crew, and those three
+    constraints compound. A repair that takes two hours of work might occupy a fortnight of calendar
+    time while everyone waits for the sea state to drop below the operating threshold.</p>
+
+  <div class="ad-slot mpu" data-ad-client="ca-pub-999">Advertisement</div>
+
+  <p>The industry's response has been to design for intervention-free operation over multi-year
+    periods, which sounds obvious but reorders every other decision. Bearings are oversized. Seals are
+    redundant. Generators are direct-drive, eliminating the gearbox that accounts for a large share of
+    wind turbine failures.</p>
+
+  <h2>Comparative performance of deployed installations</h2>
+
+  <table>
+    <thead>
+      <tr><th>Site</th><th>Capacity (MW)</th><th>Capacity factor</th><th>Commissioned</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Pentland Firth (MeyGen)</td><td>6.0</td><td>39%</td><td>2016</td></tr>
+      <tr><td>Sihwa Lake</td><td>254.0</td><td>26%</td><td>2011</td></tr>
+      <tr><td>Rance Estuary</td><td>240.0</td><td>28%</td><td>1966</td></tr>
+      <tr><td>Annapolis Royal</td><td>20.0</td><td>31%</td><td>1984</td></tr>
+      <tr><td>Jiangxia</td><td>4.1</td><td>24%</td><td>1980</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Reading the resource</h2>
+
+  <p>Site assessment now leans on a mix of acoustic doppler profiling and numerical modelling. The
+    resulting dataset is large but tractable, and the analysis is not especially exotic.</p>
+
+  <pre><code>def capacity_factor(output_mwh, rated_mw, hours):
+    """Fraction of theoretical maximum output actually delivered."""
+    theoretical = rated_mw * hours
+    if theoretical &lt;= 0:
+        raise ValueError("rated capacity and hours must be positive")
+    return output_mwh / theoretical
+
+def annual_yield(rated_mw, factor):
+    return rated_mw * 8760 * factor</code></pre>
+
+  <blockquote>
+    <p>"We stopped trying to build the cheapest turbine and started building the one that needed the
+      fewest boat trips. The economics followed."</p>
+  </blockquote>
+
+  <h2>What comes next</h2>
+
+  <p>Grid operators value predictability, and tidal generation offers a schedule that can be published
+    years ahead. As storage costs fall, the combination of predictable generation and flexible storage
+    starts to look more attractive than either alone.</p>
+
+  <p>None of this makes tidal power a replacement for wind or solar. It makes it a complement, with a
+    different risk profile and a different failure mode, which in a diversified grid is precisely the
+    point.</p>
+</article>
+
+<footer>
+  <p>© 2026 The Quiet Engineering Review</p>
+</footer>
+
+</body>
+</html>

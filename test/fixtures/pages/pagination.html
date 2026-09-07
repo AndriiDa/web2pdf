@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pagination Hazards</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 780px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+  .filler { height: 640px; background: #fbfbfb; border: 1px solid #eee; padding: 10px; }
+  .tall-image { width: 100%; height: 420px; background: linear-gradient(160deg, #2a5, #08c); }
+  .huge-image { width: 100%; height: 1900px; background: linear-gradient(160deg, #c33, #630); }
+  figure { margin: 20px 0; }
+  figcaption { font-size: 13px; color: #555; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #bbb; padding: 5px 7px; }
+  pre { background: #f4f6f8; padding: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Pagination Hazards</h1>
+
+<p>This fixture is built so that, without intervention, Chromium would split blocks that must not be
+split. Each section deliberately lands near a page boundary.</p>
+
+<!-- Pushes the next block to straddle a boundary -->
+<div class="filler">Filler block A — occupies most of the first page.</div>
+
+<!-- HAZARD 1: an image that would be cut in half -->
+<figure id="hazard-image">
+  <div class="tall-image"></div>
+  <figcaption>Hazard 1: this image and its caption must stay together on one page.</figcaption>
+</figure>
+
+<div class="filler">Filler block B.</div>
+
+<!-- HAZARD 2: a heading orphaned at the foot of a page -->
+<h2 id="hazard-heading">Hazard 2: An Orphaned Heading</h2>
+<p>This paragraph must remain on the same page as the heading above it. A heading stranded alone at
+the bottom of a page is one of the most visible pagination defects, and the planner is expected to
+push the heading forward so the pair travels together.</p>
+
+<div class="filler">Filler block C.</div>
+
+<!-- HAZARD 3: a table whose rows must not be split -->
+<table id="hazard-table">
+  <thead>
+    <tr><th>Row</th><th>Measurement</th><th>Tolerance</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>12.40</td><td>±0.05</td><td>Within specification</td></tr>
+    <tr><td>2</td><td>12.38</td><td>±0.05</td><td>Within specification</td></tr>
+    <tr><td>3</td><td>12.51</td><td>±0.05</td><td>Marginal, re-test scheduled</td></tr>
+    <tr><td>4</td><td>12.44</td><td>±0.05</td><td>Within specification</td></tr>
+    <tr><td>5</td><td>12.36</td><td>±0.05</td><td>Within specification</td></tr>
+    <tr><td>6</td><td>12.62</td><td>±0.05</td><td>Out of specification</td></tr>
+    <tr><td>7</td><td>12.41</td><td>±0.05</td><td>Within specification</td></tr>
+    <tr><td>8</td><td>12.39</td><td>±0.05</td><td>Within specification</td></tr>
+  </tbody>
+</table>
+
+<div class="filler">Filler block D.</div>
+
+<!-- HAZARD 4: a code block, which MAY split, but not mid-line -->
+<pre id="hazard-code"><code>function paginate(blocks, contentHeight) {
+  const mutations = [];
+  for (const block of blocks) {
+    const pageEnd = (Math.floor(block.top / contentHeight) + 1) * contentHeight;
+    if (block.atomic &amp;&amp; block.top + block.height > pageEnd) {
+      mutations.push({ kind: 'push', id: block.id, value: pageEnd - block.top });
+    }
+  }
+  return mutations;
+}
+
+function measure(root) {
+  return Array.from(root.children).map((el) => el.getBoundingClientRect());
+}</code></pre>
+
+<div class="filler">Filler block E.</div>
+
+<!-- HAZARD 5: an image taller than a whole page -->
+<figure id="hazard-huge">
+  <div class="huge-image"></div>
+  <figcaption>Hazard 5: taller than one A4 page; must be scaled or split deliberately.</figcaption>
+</figure>
+
+<p>Final paragraph, which should appear after everything above without any content having been lost.</p>
+
+</body>
+</html>
