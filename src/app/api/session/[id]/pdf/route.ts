@@ -13,20 +13,11 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/core/session-manager/store';
 import { regenerateSession } from '@/core/convert-service';
 import { toAppError, toPublicBody } from '@/lib/errors';
+import { contentDispositionFor } from '@/lib/content-disposition';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
-
-/** Builds a filesystem-safe download filename from the document title. */
-function filenameFor(title: string): string {
-  const base = title
-    .replace(/[^\p{L}\p{N}\s._-]/gu, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .slice(0, 80);
-  return `${base === '' ? 'document' : base}.pdf`;
-}
 
 export async function GET(
   request: Request,
@@ -47,9 +38,7 @@ export async function GET(
     }
 
     const download = new URL(request.url).searchParams.get('download') === '1';
-    const disposition = download
-      ? `attachment; filename="${filenameFor(session.title)}"`
-      : 'inline';
+    const disposition = download ? contentDispositionFor(session.title) : 'inline';
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
